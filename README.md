@@ -6,6 +6,10 @@ Element is a small iOS game in the spirit of Little Alchemy or Infinite Craft: y
 
 This started as a SwiftUI mini project and grew into something a bit bigger: a drag-and-drop crafting canvas, a persistent discovery log backed by Core Data, and a bonus map screen showing where each element was "discovered."
 
+| Craft | Discoveries | Atlas |
+| --- | --- | --- |
+| ![Craft screen](Screenshots/craft.png) | ![Discoveries screen](Screenshots/discoveries.png) | ![Atlas screen](Screenshots/atlas.png) |
+
 ## How it works
 
 Pick two elements and combine them. If that exact pair has been combined before, in this session or a previous one, you get the cached result instantly. Otherwise, the app asks the on-device language model to invent something, using a short prompt modeled after how Infinite Craft itself seems to work: a terse `"Water" + "Earth" = ?` style question rather than a full sentence, which keeps answers grounded (a common noun, not a rambling description). The six base-tier pairs (Fire+Water, Water+Earth, and so on) are pinned to their well-known results like Steam and Plant, so the start of the game feels consistent; everything past that is genuinely generated.
