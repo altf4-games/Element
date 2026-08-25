@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<model type="com.apple.IDECoreDataModeler.DataModel" documentVersion="1.0" lastSavedToolsVersion="23605" systemVersion="24A5279h" minimumToolsVersion="Automatic" sourceLanguage="Swift" userDefinedModelVersionIdentifier="">
+    <entity name="ElementEntity" representedClassName="ElementEntity" syncable="YES" codeGenerationType="class">
+        <attribute name="colorHex" attributeType="String"/>
+        <attribute name="discoveredAt" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="elementDescription" attributeType="String"/>
+        <attribute name="emoji" attributeType="String"/>
+        <attribute name="id" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="isFavorite" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
+        <attribute name="name" attributeType="String"/>
+    </entity>
+    <entity name="CombinationEntity" representedClassName="CombinationEntity" syncable="YES" codeGenerationType="class">
+        <attribute name="key" attributeType="String"/>
+        <attribute name="resultColorHex" attributeType="String"/>
+        <attribute name="resultDescription" attributeType="String"/>
+        <attribute name="resultEmoji" attributeType="String"/>
+        <attribute name="resultName" attributeType="String"/>
+    </entity>
+</model>
