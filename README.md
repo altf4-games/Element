@@ -18,9 +18,9 @@ Nothing here calls out to the internet. The model runs entirely on-device throug
 
 ## Screens
 
-**Craft** is the main screen: drag elements out of the tray onto the canvas, then drag one tile onto another to combine them. A new discovery pops up as a toast.
+**Craft** is the main screen, laid out like Infinite Craft: tap an element in the tray to drop it on the canvas, or press and hold it to drag it out (straight onto another tile combines them immediately). Drop one tile onto another to combine them; the result appears where the target was, with a "New Discovery" toast and a burst for first-time finds. Double-tap a tile to duplicate it (handy for Fire + Fire), and drag a tile back into the tray to remove it. The tray can be searched, sorted, and expanded into a full grid.
 
-**Discoveries** is a searchable log of everything you've found, with a favorites filter and a JSON export you can share.
+**Discoveries** is a searchable log of everything you've found, with a favorites filter and a JSON export you can share. Each element's detail page lists the recipes that make it and what it combines into.
 
 **Atlas** drops a pin for every element you've discovered on a world map, at a spot derived from its name so it's the same every time you look. Mostly decorative, but it was a fun excuse to use MapKit.
 
@@ -49,6 +49,7 @@ If you just want to sanity-check that Foundation Models is working on your machi
 - `AtlasView.swift` / `LocationManager.swift`: the map screen
 - `SettingsView.swift`: AI creativity, appearance, and reset
 - `Persistence.swift` / `Model.xcdatamodeld`: the Core Data stack
+- `ElementPill.swift`: the emoji + name chip and the wrapping `FlowLayout` used by the tray
 - `ElementTile.swift` / `Blob.swift`: shared UI pieces
 
 ## What this covers, for the curious
@@ -60,3 +61,5 @@ Left out on purpose: any real network calls (the whole point is that it's offlin
 ## Why no combination table
 
 Because that's the entire point. A hardcoded table of "Fire + Water = Steam" is what every other version of this game already does. The interesting part here is that the model is actually deciding, which means the game can genuinely surprise you, for better or worse.
+
+There is one small table, but only as a safety net. If the model is unavailable, errors out, takes longer than 10 seconds, or just repeats one of the inputs back ("Smoke + Smoke = Smoke"), `RecipeBook.swift` answers instead, so a combination never ends in an error. It has about 100 hand-written recipes (Smoke + Smoke = Smog, Lava + Water = Stone), and anything beyond those gets an Infinite Craft-style compound like "Flying Lava" or "Living Stone". Whatever comes back is cached, so the same pair always gives the same result.

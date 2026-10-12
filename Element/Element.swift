@@ -58,13 +58,39 @@ struct Element: Identifiable, Hashable, Codable {
         self.discoveredAt = discoveredAt
     }
 
+    /// Generated fields are untrusted, so they're normalized here: stray
+    /// quotes/punctuation stripped from the name, a single emoji kept, and
+    /// the color forced to a valid 6-digit hex.
     init(generated: GeneratedElement) {
         self.init(
-            name: generated.name,
-            emoji: generated.emoji,
-            colorHex: generated.colorHex,
-            description: generated.description
+            name: Self.cleanName(generated.name),
+            emoji: Self.cleanEmoji(generated.emoji),
+            colorHex: Self.cleanHex(generated.colorHex),
+            description: generated.description.trimmingCharacters(in: .whitespacesAndNewlines)
         )
+    }
+
+    private static func cleanName(_ raw: String) -> String {
+        let junk = CharacterSet.whitespacesAndNewlines.union(CharacterSet(charactersIn: "\"'.!?“”‘’"))
+        let words = raw.trimmingCharacters(in: junk)
+            .split(separator: " ")
+            .map { $0.prefix(1).uppercased() + $0.dropFirst() }
+        let name = words.joined(separator: " ")
+        return name.isEmpty ? "Mystery" : name
+    }
+
+    private static func cleanEmoji(_ raw: String) -> String {
+        guard let first = raw.trimmingCharacters(in: .whitespacesAndNewlines).first,
+              first.unicodeScalars.contains(where: { $0.properties.isEmojiPresentation })
+                || (first.unicodeScalars.count > 1 && first.unicodeScalars.first?.properties.isEmoji == true)
+        else { return "✨" }
+        return String(first)
+    }
+
+    private static func cleanHex(_ raw: String) -> String {
+        let hex = raw.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines.union(CharacterSet(charactersIn: "#"))).uppercased()
+        guard hex.count == 6, UInt64(hex, radix: 16) != nil else { return "8E8E93" }
+        return hex
     }
 
     init(entity: ElementEntity) {
@@ -101,10 +127,13 @@ extension Element {
     /// A stable pseudo-random map coordinate derived from the element's name,
     /// so the same element always lands in the same spot on the Atlas map
     /// across launches without needing to persist coordinates separately.
+    /// Uses FNV-1a rather than `Hasher`, which is randomly seeded per launch.
     var atlasCoordinateSeed: (latFraction: Double, lonFraction: Double) {
-        var hasher = Hasher()
-        hasher.combine(name.lowercased())
-        let hash = UInt64(bitPattern: Int64(hasher.finalize()))
+        var hash: UInt64 = 0xcbf2_9ce4_8422_2325
+        for byte in name.lowercased().utf8 {
+            hash ^= UInt64(byte)
+            hash &*= 0x100_0000_01b3
+        }
         let latFraction = Double(hash % 10_000) / 10_000
         let lonFraction = Double((hash / 10_000) % 10_000) / 10_000
         return (latFraction, lonFraction)
