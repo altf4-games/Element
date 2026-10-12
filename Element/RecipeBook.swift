@@ -11,7 +11,8 @@ import Foundation
 /// unavailable, it errors, it times out, or it only echoes an input back.
 /// Combining should never dead-end in an error, so this always returns
 /// *something*: a hand-written recipe if there is one, otherwise a result
-/// built from the two inputs' names.
+/// built from the two inputs' names. Its results aren't cached, so the
+/// model gets another try at the same pair later.
 enum RecipeBook {
     static func combine(_ a: Element, _ b: Element) -> Element {
         // Sorted so A + B and B + A always fall back to the same result.

@@ -178,12 +178,18 @@ final class GameViewModel {
         pendingCount += 1
         defer { pendingCount -= 1 }
 
-        let made = await generate(a, b, creativity: creativity) ?? RecipeBook.combine(a, b)
+        // Only model answers are cached. A `RecipeBook` fallback is
+        // deterministic and instant anyway, and leaving it uncached means the
+        // model gets another chance at this pair next time.
+        let generated = await generate(a, b, creativity: creativity)
+        let made = generated ?? RecipeBook.combine(a, b)
         // If the result is something already discovered, reuse it so the same
         // name always keeps the same emoji and color.
         let result = existing(named: made.name) ?? made
-        cache[key] = result
-        persistCombination(key: key, result: result)
+        if generated != nil {
+            cache[key] = result
+            persistCombination(key: key, result: result)
+        }
         return record(result, from: a, b)
     }
 
