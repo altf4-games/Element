@@ -2,19 +2,36 @@
 
 Combine anything. Discover what the world hasn't named yet.
 
-Element is a small iOS game in the spirit of Little Alchemy or Infinite Craft: you start with four elements (Fire, Water, Earth, Air), drag or tap two together, and get something new. The twist is that nothing is hardcoded. Every combination past the starting four is generated on the spot by Apple's on-device Foundation Models framework, so no two playthroughs necessarily land on the same result for an unusual pair.
+Element is a small iOS game in the spirit of Little Alchemy or Infinite Craft: you start with a handful of elements, drag or tap two together, and get something new. There are two worlds to play in: **Classic** (Fire, Water, Earth, Air) and **Periodic** (real chemical elements that combine into compounds and materials). Past the starting recipes, every combination is generated on the spot by Apple's on-device Foundation Models framework, so no two playthroughs necessarily land on the same result for an unusual pair.
 
 This started as a SwiftUI mini project and grew into something a bit bigger: a drag-and-drop crafting canvas, a persistent discovery log backed by Core Data, and a bonus map screen showing where each element was "discovered."
+
+**Classic mode**
 
 | Craft | Discoveries | Atlas |
 | --- | --- | --- |
 | ![Craft screen](Screenshots/craft.png) | ![Discoveries screen](Screenshots/discoveries.png) | ![Atlas screen](Screenshots/atlas.png) |
 
+**Switching modes, and Periodic mode**
+
+| Mode switcher | Periodic Craft | Periodic Discoveries |
+| --- | --- | --- |
+| ![Mode switcher](Screenshots/modes.png) | ![Periodic Craft screen](Screenshots/periodic-craft.png) | ![Periodic Discoveries screen](Screenshots/periodic-discoveries.png) |
+
 ## How it works
 
-Pick two elements and combine them. If that exact pair has been combined before, in this session or a previous one, you get the cached result instantly. Otherwise, the app asks the on-device language model to invent something, using a short prompt modeled after how Infinite Craft itself seems to work: a terse `"Water" + "Earth" = ?` style question rather than a full sentence, which keeps answers grounded (a common noun, not a rambling description). The six base-tier pairs (Fire+Water, Water+Earth, and so on) are pinned to their well-known results like Steam and Plant, so the start of the game feels consistent; everything past that is genuinely generated.
+Pick two elements and combine them. If that exact pair has been combined before, in this session or a previous one, you get the cached result instantly. Otherwise, the app asks the on-device language model to invent something, using a short prompt modeled after how Infinite Craft itself seems to work: a terse `"Water" + "Earth" = ?` style question rather than a full sentence, which keeps answers grounded (a common noun, not a rambling description). Each mode's well-known starting pairs (Fire+Water = Steam and Water+Earth = Plant in Classic, Hydrogen+Oxygen = Water and Sodium+Chlorine = Salt in Periodic) are pinned to their real results, so the start of the game feels consistent; everything past that is genuinely generated.
 
 Nothing here calls out to the internet. The model runs entirely on-device through Apple Intelligence, which is also why it needs a fairly specific setup to run at all (see below).
+
+## Game modes
+
+There are two worlds, switched from the title on the Craft screen (or in Settings). Each keeps its own discoveries and recipes, so switching never loses progress.
+
+- **Classic**: start with Fire, Water, Earth, and Air.
+- **Periodic**: start with eight real chemical elements (hydrogen, oxygen, carbon, nitrogen, sodium, chlorine, iron, sulfur) and combine them into compounds, minerals, and materials. Hydrogen + oxygen is water, sodium + chlorine is salt, iron + carbon is steel. Each element and compound's description starts with its symbol or formula.
+
+Each mode has its own AI prompt, its own pinned starting recipes, and its own offline backup recipes.
 
 ## Screens
 
@@ -48,6 +65,7 @@ If you just want to sanity-check that Foundation Models is working on your machi
 - `DiscoveryLogView.swift` / `ElementDetailView.swift`: the discoveries list and detail screen
 - `AtlasView.swift` / `LocationManager.swift`: the map screen
 - `SettingsView.swift`: AI creativity, appearance, and reset
+- `GameMode.swift`: the Classic and Periodic worlds: starting elements, pinned recipes, and AI prompts
 - `Persistence.swift` / `Model.xcdatamodeld`: the Core Data stack
 - `ElementPill.swift`: the emoji + name chip and the wrapping `FlowLayout` used by the tray
 - `ElementTile.swift` / `Blob.swift`: shared UI pieces

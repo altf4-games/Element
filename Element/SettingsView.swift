@@ -52,6 +52,10 @@ struct SettingsView: View {
 
     @State private var showingResetConfirm = false
 
+    private var modeBinding: Binding<GameMode> {
+        Binding(get: { viewModel.mode }, set: { viewModel.setMode($0) })
+    }
+
     private var creativity: AICreativity { AICreativity(rawValue: creativityRaw) ?? .balanced }
 
     var body: some View {
@@ -64,6 +68,23 @@ struct SettingsView: View {
                         }
                     }
                     .pickerStyle(.segmented)
+                }
+
+                Section {
+                    Picker("Game mode", selection: modeBinding) {
+                        ForEach(GameMode.allCases) { mode in
+                            Label(mode.label, systemImage: mode.icon).tag(mode)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+
+                    Text(viewModel.mode.tagline)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } header: {
+                    Text("Game Mode")
+                } footer: {
+                    Text("Each mode keeps its own discoveries and recipes.")
                 }
 
                 Section("AI Creativity") {
@@ -88,7 +109,7 @@ struct SettingsView: View {
                         showingResetConfirm = true
                     }
                 } footer: {
-                    Text("Deletes every discovered element and combination and starts over with just Fire, Water, Earth, and Air.")
+                    Text("Deletes every discovered element and combination in \(viewModel.mode.label) mode and starts over with its original elements. Your other mode is untouched.")
                 }
 
                 Section("About") {

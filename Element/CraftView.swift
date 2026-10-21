@@ -98,6 +98,10 @@ struct CraftView: View {
     @State private var mergeTick = 0
     @State private var removeTick = 0
 
+    private var modeBinding: Binding<GameMode> {
+        Binding(get: { viewModel.mode }, set: { viewModel.setMode($0) })
+    }
+
     private var creativity: AICreativity { AICreativity(rawValue: creativityRaw) ?? .balanced }
     private var traySort: TraySort { TraySort(rawValue: traySortRaw) ?? .newest }
     private var placementAnimation: Animation {
@@ -149,18 +153,33 @@ struct CraftView: View {
                     .disabled(canvasItems.isEmpty)
                 }
                 ToolbarItem(placement: .principal) {
-                    HStack(spacing: 6) {
-                        Text("Craft").font(.headline)
-                        Text("\(viewModel.discovered.count)")
-                            .font(.caption.weight(.bold).monospacedDigit())
-                            .padding(.horizontal, 7)
-                            .padding(.vertical, 2)
-                            .background(Color.accentColor.opacity(0.15), in: Capsule())
-                            .contentTransition(.numericText())
-                            .animation(.snappy, value: viewModel.discovered.count)
+                    Menu {
+                        Picker("Game mode", selection: modeBinding) {
+                            ForEach(GameMode.allCases) { mode in
+                                Label(mode.label, systemImage: mode.icon).tag(mode)
+                            }
+                        }
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: viewModel.mode.icon)
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(Color.accentColor)
+                            Text(viewModel.mode.label).font(.headline)
+                            Text("\(viewModel.discovered.count)")
+                                .font(.caption.weight(.bold).monospacedDigit())
+                                .padding(.horizontal, 7)
+                                .padding(.vertical, 2)
+                                .background(Color.accentColor.opacity(0.15), in: Capsule())
+                                .contentTransition(.numericText())
+                                .animation(.snappy, value: viewModel.discovered.count)
+                            Image(systemName: "chevron.down")
+                                .font(.caption2.weight(.bold))
+                                .foregroundStyle(.secondary)
+                        }
+                        .foregroundStyle(.primary)
                     }
-                    .accessibilityElement(children: .combine)
-                    .accessibilityLabel("Craft, \(viewModel.discovered.count) elements discovered")
+                    .accessibilityLabel("\(viewModel.mode.label) mode, \(viewModel.discovered.count) elements discovered")
+                    .accessibilityHint("Switch game mode")
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
@@ -182,7 +201,7 @@ struct CraftView: View {
             }
             .overlay(alignment: .top) {
                 if let discovery = viewModel.newDiscovery {
-                    DiscoveryToast(discovery: discovery)
+                    DiscoveryToast(discovery: discovery, label: viewModel.mode.discoveryLabel)
                         .padding(.top, 8)
                         .id(discovery.element.id)
                         .transition(.move(edge: .top).combined(with: .opacity))
@@ -204,6 +223,12 @@ struct CraftView: View {
             .sensoryFeedback(.impact(weight: .medium), trigger: mergeTick)
             .sensoryFeedback(.impact(weight: .light), trigger: removeTick)
             .sensoryFeedback(.selection, trigger: highlightedTargetID) { _, new in new != nil }
+            .onChange(of: viewModel.mode) {
+                // A fresh world gets a fresh canvas.
+                canvasItems.removeAll()
+                pending.removeAll()
+                searchText = ""
+            }
             .onChange(of: canvasSize) {
                 // Keep tiles reachable when the tray expands and the canvas shrinks.
                 for index in canvasItems.indices {
@@ -273,7 +298,7 @@ struct CraftView: View {
                 .symbolEffect(.wiggle, options: .repeat(.periodic(delay: 3)), isActive: !reduceMotion)
             Text("Start crafting")
                 .font(.headline)
-            Text("Tap an element below, or hold and drag it up here.\nDrop one element onto another to combine them.")
+            Text(viewModel.mode.emptyStateHint)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -513,8 +538,10 @@ struct CraftView: View {
         }
         mergeTick += 1
 
+        let startMode = viewModel.mode
         Task {
             let outcome = await viewModel.combine(dragged.element, target.element, creativity: creativity)
+            guard viewModel.mode == startMode else { return }
             withAnimation(placementAnimation) {
                 pending.removeAll { $0.id == merge.id }
                 canvasItems.append(CanvasItem(element: outcome.element, position: merge.position))
@@ -708,6 +735,7 @@ private struct BurstView: View {
 
 struct DiscoveryToast: View {
     let discovery: Discovery
+    var label = "NEW DISCOVERY"
 
     private var tint: Color { Color(hex: discovery.element.colorHex) }
 
@@ -718,7 +746,7 @@ struct DiscoveryToast: View {
                 .frame(width: 46, height: 46)
                 .background(Circle().fill(tint.opacity(0.2)))
             VStack(alignment: .leading, spacing: 1) {
-                Text("NEW DISCOVERY")
+                Text(label)
                     .font(.caption2.weight(.heavy))
                     .tracking(1)
                     .foregroundStyle(.secondary)

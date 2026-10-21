@@ -14,14 +14,15 @@ import Foundation
 /// built from the two inputs' names. Its results aren't cached, so the
 /// model gets another try at the same pair later.
 enum RecipeBook {
-    static func combine(_ a: Element, _ b: Element) -> Element {
+    static func combine(_ a: Element, _ b: Element, mode: GameMode) -> Element {
         // Sorted so A + B and B + A always fall back to the same result.
         let (first, second) = a.name.lowercased() <= b.name.lowercased() ? (a, b) : (b, a)
 
-        if let entry = recipes[key(first.name, second.name)] {
+        let table = mode == .periodic ? periodicRecipes : recipes
+        if let entry = table[key(first.name, second.name)] {
             return Element(name: entry.name, emoji: entry.emoji, colorHex: entry.colorHex, description: entry.description)
         }
-        return improvise(first, second)
+        return mode == .periodic ? improvisePeriodic(first, second) : improvise(first, second)
     }
 
     // MARK: - Improvised results
@@ -65,6 +66,43 @@ enum RecipeBook {
             description: "\(a.name) and \(b.name), fused into something new."
         )
     }
+
+    /// Chemistry-flavored compounds when nothing is hand-written: two metals
+    /// make an alloy, anything else becomes a compound named for its parts.
+    private static func improvisePeriodic(_ a: Element, _ b: Element) -> Element {
+        let colorHex = blend(a.colorHex, b.colorHex)
+        let (x, y) = (a.name, b.name)
+
+        if x.caseInsensitiveCompare(y) == .orderedSame {
+            return Element(
+                name: "\(x) Gas",
+                emoji: a.emoji,
+                colorHex: a.colorHex,
+                description: "Two of the same, bonded together into a molecule."
+            )
+        }
+
+        let bothMetals = metals.contains(lastWord(x).lowercased()) && metals.contains(lastWord(y).lowercased())
+        if bothMetals {
+            return Element(
+                name: "\(lastWord(x))-\(lastWord(y)) Alloy",
+                emoji: "🔩",
+                colorHex: colorHex,
+                description: "A blend of \(x.lowercased()) and \(y.lowercased()), stronger together."
+            )
+        }
+        return Element(
+            name: "\(lastWord(x)) \(lastWord(y)) Compound",
+            emoji: "⚗️",
+            colorHex: colorHex,
+            description: "\(x) and \(y), bonded into something new."
+        )
+    }
+
+    private static let metals: Set<String> = [
+        "iron", "sodium", "steel", "copper", "gold", "silver", "tin", "lead",
+        "zinc", "aluminium", "aluminum", "magnesium", "calcium", "potassium", "nickel",
+    ]
 
     /// The flavor an element lends when it's the modifier in a compound.
     private static func adjective(for element: Element) -> String? {
@@ -159,7 +197,6 @@ enum RecipeBook {
             ("Cloud", "Rain", Entry(name: "Storm", emoji: "⛈️", colorHex: "5C6B7A", description: "Rain with a bad attitude.")),
             ("Dust", "Rain", Entry(name: "Mud", emoji: "🟫", colorHex: "6D4C41", description: "Squishy, sticky, and everywhere.")),
             ("Dust", "Water", Entry(name: "Mud", emoji: "🟫", colorHex: "6D4C41", description: "Squishy, sticky, and everywhere.")),
-            ("Dust", "Fire", Entry(name: "Gunpowder", emoji: "💥", colorHex: "37474F", description: "Dust with an explosive personality.")),
             ("Air", "Dust", Entry(name: "Sandstorm", emoji: "🌪️", colorHex: "D7B98E", description: "The desert going for a run.")),
             ("Dust", "Earth", Entry(name: "Sand", emoji: "⏳", colorHex: "E2C792", description: "Countless grains, each one patient.")),
             ("Dust", "Plant", Entry(name: "Pollen", emoji: "🌼", colorHex: "FFD54F", description: "Tiny specks riding the breeze.")),
@@ -209,6 +246,53 @@ enum RecipeBook {
             ("Mud", "Plant", Entry(name: "Swamp", emoji: "🐸", colorHex: "556B2F", description: "Murky, muddy, and full of life.")),
             ("Lightning", "Water", Entry(name: "Life", emoji: "🧬", colorHex: "AB47BC", description: "The spark that started everything.")),
             ("Life", "Earth", Entry(name: "Human", emoji: "🧑", colorHex: "FFAB91", description: "Curious, clever, and a little messy.")),
+        ]
+        var table: [String: Entry] = [:]
+        for (a, b, entry) in list {
+            table[key(a, b)] = entry
+        }
+        return table
+    }()
+
+    private static let periodicRecipes: [String: Entry] = {
+        let list: [(String, String, Entry)] = [
+            // Base elements
+            ("Hydrogen", "Oxygen", Entry(name: "Water", emoji: "💧", colorHex: "3498DB", description: "H₂O · Two hydrogens and an oxygen, the molecule of life.")),
+            ("Carbon", "Oxygen", Entry(name: "Carbon Dioxide", emoji: "🫧", colorHex: "90A4AE", description: "CO₂ · The gas you breathe out and plants breathe in.")),
+            ("Hydrogen", "Nitrogen", Entry(name: "Ammonia", emoji: "🧪", colorHex: "AED581", description: "NH₃ · A sharp-smelling gas used in fertilizer and cleaners.")),
+            ("Carbon", "Hydrogen", Entry(name: "Methane", emoji: "🔥", colorHex: "FF8A65", description: "CH₄ · The simplest hydrocarbon, and the main part of natural gas.")),
+            ("Chlorine", "Sodium", Entry(name: "Salt", emoji: "🧂", colorHex: "ECEFF1", description: "NaCl · A violent metal and a toxic gas, tamed into table salt.")),
+            ("Iron", "Oxygen", Entry(name: "Rust", emoji: "🟠", colorHex: "B5532A", description: "Fe₂O₃ · What iron turns into when it meets oxygen and time.")),
+            ("Carbon", "Iron", Entry(name: "Steel", emoji: "⚙️", colorHex: "90A4AE", description: "Fe + C · Iron with a pinch of carbon, much stronger than either.")),
+            ("Oxygen", "Sulfur", Entry(name: "Sulfur Dioxide", emoji: "🌋", colorHex: "FFB74D", description: "SO₂ · The sharp gas you smell near volcanoes.")),
+
+            // Doubles
+            ("Hydrogen", "Hydrogen", Entry(name: "Hydrogen Gas", emoji: "🎈", colorHex: "81D4FA", description: "H₂ · Two hydrogens sharing a bond, light enough to float a balloon.")),
+            ("Oxygen", "Oxygen", Entry(name: "Ozone", emoji: "☁️", colorHex: "81D4FA", description: "O₃ · Three oxygens that shield the planet from the sun's UV.")),
+            ("Nitrogen", "Nitrogen", Entry(name: "Nitrogen Gas", emoji: "🌫️", colorHex: "9575CD", description: "N₂ · Four fifths of the air, and very hard to react.")),
+            ("Carbon", "Carbon", Entry(name: "Diamond", emoji: "💎", colorHex: "B3E5FC", description: "C · Carbon atoms locked in a perfect crystal.")),
+            ("Iron", "Iron", Entry(name: "Iron Bar", emoji: "🧱", colorHex: "78909C", description: "Fe · Solid iron, ready to be worked.")),
+            ("Sulfur", "Sulfur", Entry(name: "Sulfur Crystal", emoji: "🟨", colorHex: "FDD835", description: "S₈ · Rings of eight sulfur atoms, bright yellow.")),
+            ("Water", "Water", Entry(name: "Ice", emoji: "🧊", colorHex: "B3E5FC", description: "H₂O · Water that stopped moving around.")),
+            ("Salt", "Salt", Entry(name: "Rock Salt", emoji: "🪨", colorHex: "CFD8DC", description: "NaCl · Salt crystals packed into rock.")),
+
+            // Compounds and beyond
+            ("Salt", "Water", Entry(name: "Brine", emoji: "🌊", colorHex: "4DB6AC", description: "NaCl + H₂O · Salt water, a bit like the sea.")),
+            ("Carbon Dioxide", "Water", Entry(name: "Soda Water", emoji: "🥤", colorHex: "80DEEA", description: "H₂CO₃ · Water with the fizz of dissolved carbon dioxide.")),
+            ("Carbon", "Water", Entry(name: "Sugar", emoji: "🍬", colorHex: "F8BBD0", description: "C₆H₁₂O₆ · Carbon, hydrogen, and oxygen in a sweet arrangement.")),
+            ("Iron", "Water", Entry(name: "Rust", emoji: "🟠", colorHex: "B5532A", description: "Fe₂O₃ · What iron turns into when it meets oxygen and time.")),
+            ("Sodium", "Water", Entry(name: "Lye", emoji: "🧼", colorHex: "E0E0E0", description: "NaOH · A strong base that makes soap, and fizzes violently along the way.")),
+            ("Hydrogen", "Sulfur", Entry(name: "Hydrogen Sulfide", emoji: "🥚", colorHex: "FFF59D", description: "H₂S · The smell of rotten eggs.")),
+            ("Chlorine", "Hydrogen", Entry(name: "Hydrochloric Acid", emoji: "⚗️", colorHex: "C5E1A5", description: "HCl · A strong acid, and the one in your stomach.")),
+            ("Nitrogen", "Oxygen", Entry(name: "Nitrous Oxide", emoji: "🎈", colorHex: "CE93D8", description: "N₂O · Laughing gas.")),
+            ("Iron", "Sulfur", Entry(name: "Pyrite", emoji: "✨", colorHex: "FFD54F", description: "FeS₂ · Fool's gold, shiny enough to fool the hopeful.")),
+            ("Methane", "Oxygen", Entry(name: "Fire", emoji: "🔥", colorHex: "FF5722", description: "CH₄ + O₂ · Combustion, releasing heat and light.")),
+            ("Oxygen", "Steel", Entry(name: "Rust", emoji: "🟠", colorHex: "B5532A", description: "Fe₂O₃ · Even steel gives in eventually.")),
+            ("Ammonia", "Carbon Dioxide", Entry(name: "Urea", emoji: "🌾", colorHex: "FFE082", description: "CO(NH₂)₂ · A key ingredient in fertilizer.")),
+            ("Carbon", "Diamond", Entry(name: "Graphite", emoji: "✏️", colorHex: "607D8B", description: "C · Soft, dark carbon: the stuff in pencils.")),
+            ("Steel", "Water", Entry(name: "Rust", emoji: "🟠", colorHex: "B5532A", description: "Fe₂O₃ · Steel left out in the rain.")),
+            ("Carbon", "Sulfur", Entry(name: "Carbon Disulfide", emoji: "🧪", colorHex: "FFEE58", description: "CS₂ · A smelly liquid used in industry.")),
+            ("Ice", "Salt", Entry(name: "Slush", emoji: "🧊", colorHex: "B2EBF2", description: "Salt melts ice, which is why we spread it on roads.")),
         ]
         var table: [String: Entry] = [:]
         for (a, b, entry) in list {

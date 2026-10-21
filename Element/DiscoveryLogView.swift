@@ -15,7 +15,10 @@ import SwiftUI
 struct DiscoveryLogView: View {
     @Environment(GameViewModel.self) private var viewModel
 
-    @FetchRequest(sortDescriptors: [SortDescriptor(\ElementEntity.discoveredAt, order: .reverse)])
+    @FetchRequest(
+        sortDescriptors: [SortDescriptor(\ElementEntity.discoveredAt, order: .reverse)],
+        predicate: NSPredicate(format: "mode == %@", GameMode.current.rawValue)
+    )
     private var entities: FetchedResults<ElementEntity>
 
     @State private var searchText = ""
@@ -60,6 +63,9 @@ struct DiscoveryLogView: View {
                 }
             }
             .searchable(text: $searchText, prompt: "Search elements")
+            .onChange(of: viewModel.mode) {
+                entities.nsPredicate = NSPredicate(format: "mode == %@", viewModel.mode.rawValue)
+            }
             .navigationTitle("Discoveries")
             .navigationDestination(for: Element.self) { element in
                 ElementDetailView(element: element)

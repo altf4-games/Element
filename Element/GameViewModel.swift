@@ -65,6 +65,9 @@ struct Recipe: Identifiable {
 @MainActor
 @Observable
 final class GameViewModel {
+    /// Which world is being played. Each mode has its own elements, recipes,
+    /// and saved progress; `setMode(_:)` swaps all of it at once.
+    private(set) var mode: GameMode
     private(set) var discovered: [Element] = []
     /// A counter rather than a flag, since several combines can be in
     /// flight at once on the canvas.
@@ -93,6 +96,7 @@ final class GameViewModel {
 
     init(context: NSManagedObjectContext) {
         self.context = context
+        self.mode = GameMode.current
 
         switch SystemLanguageModel.default.availability {
         case .available:
@@ -109,50 +113,37 @@ final class GameViewModel {
 
         loadFromDisk()
         seedBaseCombinations()
-
-        if unavailableReason == nil {
-            spareSession = Self.makeSession()
-            spareSession?.prewarm()
-        }
+        refreshSpareSession()
     }
 
-    // Prompt style modeled on the terse equation format community
-    // reverse-engineering of Infinite Craft found in its own combination
-    // calls ("word1" + "word2" = ?), rather than a descriptive sentence —
-    // that framing biases the model toward a literal compound-word
-    // answer instead of a creative-writing response.
-    private static let instructions = """
-    You combine two words according to their real-world meaning, like a \
-    crafting game. Answer with the single most obvious, common-sense \
-    result — the one almost anyone would guess first. Not the most \
-    original, clever, or unexpected one.
+    /// Switches worlds: saves the choice, then reloads the elements and
+    /// recipes belonging to the new mode.
+    func setMode(_ newMode: GameMode) {
+        guard newMode != mode else { return }
+        UserDefaults.standard.set(newMode.rawValue, forKey: GameMode.storageKey)
+        mode = newMode
+        newDiscovery = nil
+        discovered = []
+        cache.removeAll()
+        loadFromDisk()
+        seedBaseCombinations()
+        spareSession = nil
+        refreshSpareSession()
+    }
 
-    Rules:
-    - Prefer a single common noun. Avoid adjectives.
-    - Keep it general and simple, not hyper-specific.
-    - Never answer with either input word unchanged.
-    - Two words maximum.
+    private static func makeSession(for mode: GameMode) -> LanguageModelSession {
+        LanguageModelSession(instructions: mode.instructions)
+    }
 
-    Examples:
-    - "Water" + "Earth" = "Plant"
-    - "Fire" + "Water" = "Steam"
-    - "Fire" + "Earth" = "Lava"
-    - "Water" + "Air" = "Rain"
-    - "Fire" + "Air" = "Smoke"
-    - "Earth" + "Air" = "Dust"
-    - "Fire" + "Fire" = "Inferno"
-
-    Also pick a single emoji and a hex color that fit the result.
-    """
-
-    private static func makeSession() -> LanguageModelSession {
-        LanguageModelSession(instructions: instructions)
+    private func refreshSpareSession() {
+        guard unavailableReason == nil else { return }
+        spareSession = Self.makeSession(for: mode)
+        spareSession?.prewarm()
     }
 
     private func takeSession() -> LanguageModelSession {
-        let session = spareSession ?? Self.makeSession()
-        spareSession = Self.makeSession()
-        spareSession?.prewarm()
+        let session = spareSession ?? Self.makeSession(for: mode)
+        refreshSpareSession()
         return session
     }
 
@@ -170,6 +161,7 @@ final class GameViewModel {
     @discardableResult
     func combine(_ a: Element, _ b: Element, creativity: AICreativity) async -> CombineOutcome {
         let key = cacheKey(for: a, b)
+        let startMode = mode
 
         if let cached = cache[key] {
             return record(cached, from: a, b)
@@ -181,8 +173,11 @@ final class GameViewModel {
         // Only model answers are cached. A `RecipeBook` fallback is
         // deterministic and instant anyway, and leaving it uncached means the
         // model gets another chance at this pair next time.
-        let generated = await generate(a, b, creativity: creativity)
-        let made = generated ?? RecipeBook.combine(a, b)
+        let generated = await generate(a, b, creativity: creativity, in: startMode)
+        let made = generated ?? RecipeBook.combine(a, b, mode: startMode)
+        // The player switched worlds while this was generating. Hand the
+        // result back, but don't file it under the wrong mode.
+        guard startMode == mode else { return CombineOutcome(element: made, isNew: false) }
         // If the result is something already discovered, reuse it so the same
         // name always keeps the same emoji and color.
         let result = existing(named: made.name) ?? made
@@ -196,12 +191,13 @@ final class GameViewModel {
     /// Asks the model, or returns `nil` so the caller can fall back. An
     /// answer that just repeats an input ("Smoke + Smoke = Smoke") gets one
     /// retry with a hotter temperature before giving up.
-    private func generate(_ a: Element, _ b: Element, creativity: AICreativity) async -> Element? {
+    private func generate(_ a: Element, _ b: Element, creativity: AICreativity, in startMode: GameMode) async -> Element? {
         guard unavailableReason == nil else { return nil }
 
         let prompt = "\"\(a.name)\" + \"\(b.name)\" = ?"
         let temperatures = [creativity.temperature, max(creativity.temperature, 1.0)]
         for temperature in temperatures {
+            guard mode == startMode else { return nil }
             let session = takeSession()
             let options = GenerationOptions(temperature: temperature)
             let request = Task {
@@ -233,22 +229,27 @@ final class GameViewModel {
         persistFavorite(discovered[index])
     }
 
-    /// Wipes all persisted progress and returns to the four starting elements.
+    /// Wipes the current mode's progress and returns to its starting
+    /// elements. The other mode's progress is left alone.
     func resetProgress() {
         // Deleting through the context (rather than `NSBatchDeleteRequest`)
         // keeps `@FetchRequest` in the Discoveries tab in sync immediately.
-        for entity in (try? context.fetch(ElementEntity.fetchRequest())) ?? [] {
+        let elementRequest = ElementEntity.fetchRequest()
+        elementRequest.predicate = modePredicate
+        for entity in (try? context.fetch(elementRequest)) ?? [] {
             context.delete(entity)
         }
-        for entity in (try? context.fetch(CombinationEntity.fetchRequest())) ?? [] {
+        let combinationRequest = CombinationEntity.fetchRequest()
+        combinationRequest.predicate = modePredicate
+        for entity in (try? context.fetch(combinationRequest)) ?? [] {
             context.delete(entity)
         }
         try? context.save()
 
         cache.removeAll()
         newDiscovery = nil
-        discovered = Element.baseElements
-        for base in Element.baseElements {
+        discovered = mode.baseElements
+        for base in mode.baseElements {
             persistElement(base)
         }
         seedBaseCombinations()
@@ -292,14 +293,19 @@ final class GameViewModel {
 
     // MARK: - Persistence
 
+    private var modePredicate: NSPredicate {
+        NSPredicate(format: "mode == %@", mode.rawValue)
+    }
+
     private func loadFromDisk() {
         let elementRequest = ElementEntity.fetchRequest()
+        elementRequest.predicate = modePredicate
         elementRequest.sortDescriptors = [NSSortDescriptor(keyPath: \ElementEntity.discoveredAt, ascending: true)]
         let storedElements = (try? context.fetch(elementRequest)) ?? []
 
         if storedElements.isEmpty {
-            discovered = Element.baseElements
-            for base in Element.baseElements {
+            discovered = mode.baseElements
+            for base in mode.baseElements {
                 persistElement(base)
             }
         } else {
@@ -307,6 +313,7 @@ final class GameViewModel {
         }
 
         let combinationRequest = CombinationEntity.fetchRequest()
+        combinationRequest.predicate = modePredicate
         let storedCombinations = (try? context.fetch(combinationRequest)) ?? []
         for entity in storedCombinations {
             guard let key = entity.key else { continue }
@@ -328,6 +335,7 @@ final class GameViewModel {
         entity.elementDescription = element.description
         entity.isFavorite = element.isFavorite
         entity.discoveredAt = element.discoveredAt
+        entity.mode = mode.rawValue
         try? context.save()
     }
 
@@ -344,6 +352,7 @@ final class GameViewModel {
     private func persistCombination(key: String, result: Element) {
         let entity = CombinationEntity(context: context)
         entity.key = key
+        entity.mode = mode.rawValue
         entity.resultName = result.name
         entity.resultEmoji = result.emoji
         entity.resultColorHex = result.colorHex
@@ -351,20 +360,12 @@ final class GameViewModel {
         try? context.save()
     }
 
-    /// Pins the six base-tier pairs to their well-known real-world results
-    /// (matching what Infinite Craft itself produces) instead of leaving
-    /// them to the model's variance — "Water + Earth" should always be
-    /// "Plant", not sometimes "Mud". Only fills in combinations that aren't
-    /// already cached, so it never clobbers a result from an earlier session.
+    /// Pins each mode's well-known starting pairs to their real results
+    /// (Water + Earth should always be Plant, not sometimes Mud) instead of
+    /// leaving them to the model's variance. Only fills in combinations
+    /// that aren't already cached, so it never clobbers an earlier result.
     private func seedBaseCombinations() {
-        let seeds: [(String, String, Element)] = [
-            ("Fire", "Water", Element(name: "Steam", emoji: "♨️", colorHex: "CBD5E0", description: "A hot mist where fire meets water.")),
-            ("Fire", "Earth", Element(name: "Lava", emoji: "🌋", colorHex: "FF4500", description: "Molten rock, glowing and unstoppable.")),
-            ("Fire", "Air", Element(name: "Smoke", emoji: "🌫️", colorHex: "708090", description: "A hazy trail left behind by flame.")),
-            ("Water", "Earth", Element(name: "Plant", emoji: "🌱", colorHex: "2ECC71", description: "Something green, reaching for the sun.")),
-            ("Water", "Air", Element(name: "Rain", emoji: "🌧️", colorHex: "4A90D9", description: "Water falling from the sky.")),
-            ("Earth", "Air", Element(name: "Dust", emoji: "🏜️", colorHex: "C2B280", description: "Fine, dry particles carried on the wind.")),
-        ]
+        let seeds = mode.seedRecipes
 
         for (first, second, result) in seeds {
             let key = [first.lowercased(), second.lowercased()].sorted().joined(separator: "+")
