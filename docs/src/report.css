@@ -1,0 +1,57 @@
+@font-face { font-family: Body; src: local("Liberation Serif"); }
+@page {
+  size: A4;
+  margin: 34mm 18mm 22mm 28mm;
+  @bottom-center { content: counter(page); font: 10pt "Liberation Serif"; }
+}
+@page cover { margin: 34mm 18mm 22mm 28mm; @bottom-center { content: none; } }
+@page :first { @bottom-center { content: none; } }
+* { box-sizing: border-box; }
+html { font: 11pt/1.45 "Liberation Serif", "Times New Roman", serif; color: #111; }
+body { margin: 0; }
+.deco { position: fixed; }
+.deco.bar { left: -28mm; top: -7mm; width: 14mm; height: 270mm; }
+.deco.logo1 { left: -14mm; top: -26mm; height: 17mm; }
+.deco.logo2 { right: -12mm; top: -28mm; height: 20mm; }
+p { text-align: justify; margin: 0 0 3.2mm; orphans: 3; widows: 3; }
+h1 { font-size: 17pt; margin: 0 0 5mm; page-break-before: always; page-break-after: avoid; }
+h1.noN { page-break-before: always; }
+h1.front { font-size: 17pt; }
+.mainstart + h1 { page-break-before: always; }
+h2 { font-size: 13pt; margin: 6mm 0 2.5mm; page-break-after: avoid; }
+ul, ol { margin: 0 0 3.5mm; padding-left: 7mm; text-align: justify; }
+li { margin-bottom: 1.2mm; }
+code { font: 9.6pt "Liberation Mono", monospace; background: #f1f1f1; padding: 0 1mm; border-radius: 1mm; }
+pre { font: 8.4pt/1.35 "Liberation Mono", monospace; background: #f6f6f6; border: .3mm solid #ddd; padding: 3mm; white-space: pre-wrap; margin: 2mm 0 4mm; page-break-inside: avoid; }
+figure { margin: 3mm 0 4mm; text-align: center; page-break-inside: avoid; }
+figure img { max-width: 100%; }
+figcaption, .figcap, .tcap { font-size: 10pt; text-align: center; margin-top: 1.5mm; }
+.tcap { margin: 3mm 0 1.5mm; page-break-after: avoid; }
+table { width: 100%; border-collapse: collapse; font-size: 10pt; margin-bottom: 4mm; table-layout: fixed; }
+tr { page-break-inside: avoid; }
+th { background: #dcdcdc; text-align: left; padding: 1.6mm 2mm; border: .25mm solid #888; }
+td { padding: 1.5mm 2mm; border: .25mm solid #888; vertical-align: top; }
+tr:nth-child(even) td { background: #fafafa; }
+.shots { display: flex; justify-content: center; gap: 4mm; margin: 3mm 0 0; page-break-inside: avoid; }
+.shots figure { margin: 0; width: 31%; }
+.shots img { width: 100%; border-radius: 4mm; border: .3mm solid #bbb; }
+.figcap { margin-bottom: 4mm; }
+/* cover */
+.cover { page: cover; text-align: center; font-size: 12pt; padding-top: 22mm; }
+.ctitle { font-size: 40pt; font-weight: bold; }
+.csub { font-style: italic; font-size: 13pt; margin: 3mm 12mm 12mm; }
+.rule { border-top: .35mm solid #000; margin: 0 6mm 6mm; }
+.ctype { font-size: 17pt; font-weight: bold; margin-bottom: 6mm; }
+.small { font-size: 10pt; color: #444; margin-top: 8mm; }
+.cname { font-size: 15pt; font-weight: bold; }
+.b { font-weight: bold; }
+.demo { margin-top: 14mm; font-size: 10pt; color: #666; }
+.kw { margin-top: 5mm; }
+/* toc */
+.toc div { display: block; margin: 0 0 .5mm; font-size: 10pt; }
+.toc .t1 { font-weight: bold; margin-top: 1.6mm; }
+.toc .t2 { padding-left: 6mm; }
+.toc a { color: #111; text-decoration: none; }
+.toc a::after { content: leader('.') target-counter(attr(href), page); }
+.ref { text-align: left; padding-left: 9mm; text-indent: -9mm; }
+h1.lot { page-break-before: avoid; margin-top: 12mm; }
